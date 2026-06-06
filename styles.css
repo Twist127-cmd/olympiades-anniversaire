@@ -354,6 +354,53 @@ h2, h3, p { margin-top: 0; }
 .event-header h2 { margin: 1px 0 4px; font-size: 21px; }
 .event-header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
 
+.game-explanation,
+.scoring-explanation {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 16px;
+  border: 1px solid #c4b5fd;
+  border-radius: 19px;
+  background: linear-gradient(145deg, #faf5ff, #eef2ff);
+}
+
+.scoring-explanation {
+  border-color: #bfdbfe;
+  background: linear-gradient(145deg, #eff6ff, #f0fdfa);
+}
+
+.explanation-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand), #4f46e5);
+  font-size: 18px;
+  font-weight: 900;
+  place-items: center;
+}
+
+.scoring-explanation .explanation-icon {
+  background: linear-gradient(135deg, #0284c7, #0d9488);
+}
+
+.game-explanation h3,
+.scoring-explanation h3 {
+  margin: 1px 0 6px;
+  font-size: 15px;
+}
+
+.game-explanation p,
+.scoring-explanation p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .score-strip {
   display: flex;
   gap: 7px;

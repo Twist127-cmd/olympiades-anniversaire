@@ -10,17 +10,17 @@ const DEFAULT_TEAMS = [
 const TEAM_COLORS = ["#ef4444", "#eab308", "#3b82f6", "#8b5cf6", "#10b981", "#f97316", "#ec4899", "#06b6d4", "#84cc16", "#6366f1"];
 
 const EVENT_DEFS = [
-  { id: "race", name: "The Blinded Race + Rébus", short: "Blinded Race", rule: "Saisir le rang d’arrivée. 1er = 15, 2e = 10, 3e = 5, 4e = 0." },
-  { id: "measure", name: "La Juste Mesure", short: "Juste Mesure", rule: "La valeur la plus proche gagne 5 points. Une estimation exacte ajoute 20 points." },
-  { id: "weight", name: "Le Juste Poids", short: "Juste Poids", rule: "La valeur la plus proche gagne 5 points. Une estimation exacte ajoute 20 points." },
-  { id: "price", name: "Le Juste Prix", short: "Juste Prix", rule: "La valeur la plus proche gagne 5 points. Une estimation exacte ajoute 20 points." },
-  { id: "time", name: "Le Juste Temps", short: "Juste Temps", rule: "La valeur la plus proche gagne 5 points. Une estimation exacte ajoute 20 points." },
-  { id: "submarine", name: "Championnat Submarine", short: "Submarine", rule: "Classement final : 1er = 7, 2e = 5, 3e = 3, 4e = 0." },
-  { id: "cafe", name: "Course du Garçon de Café", short: "Garçon de Café", rule: "1er = 15, 2e = 10, 3e = 5, 4e = 0, puis −1 point par verre perdu." },
-  { id: "water", name: "Water Cup", short: "Water Cup", rule: "Classement final : 1er = 7, 2e = 5, 3e = 3, 4e = 0." },
-  { id: "kahoot", name: "Kahoot sur Maëlle", short: "Kahoot Maëlle", rule: "Chaque bonne réponse rapporte 2 points." },
-  { id: "costume", name: "Concours de Déguisement", short: "Déguisement", rule: "1er = 30, 2e = 20, 3e = 10. Un duo attribue tous les points aux deux équipes." },
-  { id: "taste", name: "Dégustation Mystère Bretz", short: "Dégustation Bretz", rule: "Goût exact = 5 points, plus 1 point par ingrédient trouvé." }
+  { id: "race", name: "The Blinded Race + Rébus", short: "Blinded Race", description: "Chaque équipe réalise une course à l’aveugle, guidée par ses coéquipiers. Une fois le parcours terminé, elle doit résoudre un rébus. Le classement est déterminé par l’ordre d’arrivée après validation du rébus.", rule: "Saisir le rang d’arrivée. 1er = 15, 2e = 10, 3e = 5, 4e = 0." },
+  { id: "measure", name: "La Juste Mesure", short: "Juste Mesure", description: "À chaque manche, une distance réelle doit être estimée sans utiliser d’instrument de mesure. Les équipes annoncent leur estimation, puis l’organisateur révèle la valeur réelle et compare les écarts.", rule: "La valeur la plus proche gagne 5 points. Une estimation exacte ajoute 20 points." },
+  { id: "weight", name: "Le Juste Poids", short: "Juste Poids", description: "Les équipes doivent estimer le poids d’un objet ou d’une quantité présentée, sans utiliser de balance. La valeur réelle est ensuite révélée pour déterminer l’estimation la plus proche.", rule: "La valeur la plus proche gagne 5 points. Une estimation exacte ajoute 20 points." },
+  { id: "price", name: "Le Juste Prix", short: "Juste Prix", description: "Plusieurs objets, produits ou valeurs sont présentés successivement. Chaque équipe propose un prix, puis le prix réel est annoncé. L’application compare automatiquement les écarts.", rule: "La valeur la plus proche gagne 5 points. Une estimation exacte ajoute 20 points." },
+  { id: "time", name: "Le Juste Temps", short: "Juste Temps", description: "Pour chaque manche, les équipes doivent estimer une durée annoncée ou réalisée, sans chronomètre. Une fois les estimations enregistrées, le temps réel est révélé.", rule: "La valeur la plus proche gagne 5 points. Une estimation exacte ajoute 20 points." },
+  { id: "submarine", name: "Championnat Submarine", short: "Submarine", description: "Les équipes participent au championnat du jeu Submarine. À la fin des parties ou du tournoi, l’organisateur saisit le classement général obtenu par chaque équipe.", rule: "Classement final : 1er = 7, 2e = 5, 3e = 3, 4e = 0." },
+  { id: "cafe", name: "Course du Garçon de Café", short: "Garçon de Café", description: "Chaque équipe effectue un parcours en transportant des verres comme un garçon de café. Le classement dépend de l’ordre d’arrivée, mais chaque verre renversé ou perdu entraîne une pénalité.", rule: "1er = 15, 2e = 10, 3e = 5, 4e = 0, puis −1 point par verre perdu." },
+  { id: "water", name: "Water Cup", short: "Water Cup", description: "Les équipes doivent transporter ou récupérer le plus d’eau possible selon le parcours prévu. À la fin de l’épreuve, elles sont classées selon la quantité d’eau effectivement conservée.", rule: "Classement final : 1er = 7, 2e = 5, 3e = 3, 4e = 0." },
+  { id: "kahoot", name: "Kahoot sur Maëlle", short: "Kahoot Maëlle", description: "Les équipes répondent à dix questions consacrées à Maëlle. Pour chaque question, l’organisateur indique dans l’application si la réponse de l’équipe est bonne ou mauvaise.", rule: "Chaque bonne réponse rapporte 2 points." },
+  { id: "costume", name: "Concours de Déguisement", short: "Déguisement", description: "Les participants présentent leur déguisement, seuls ou en duo. Un classement des trois meilleurs déguisements est établi. Pour un duo composé de deux équipes, les deux équipes reçoivent les points de la place obtenue.", rule: "1er = 30, 2e = 20, 3e = 10. Un duo attribue tous les points aux deux équipes." },
+  { id: "taste", name: "Dégustation Mystère Bretz", short: "Dégustation Bretz", description: "Lors de chaque manche, les équipes goûtent une saveur Bretz à l’aveugle. Elles tentent d’identifier le goût exact et peuvent également citer les ingrédients qu’elles pensent avoir reconnus.", rule: "Goût exact = 5 points, plus 1 point par ingrédient trouvé." }
 ];
 
 const sampleData = {
@@ -137,10 +137,15 @@ function migrateState(data) {
     color: team.color || TEAM_COLORS[index % TEAM_COLORS.length]
   }));
   if (!Array.isArray(data.eventDefs)) data.eventDefs = clone(EVENT_DEFS);
+  data.eventDefs.forEach(def => {
+    const nativeDef = EVENT_DEFS.find(item => item.id === def.id);
+    if (!def.description && nativeDef?.description) def.description = nativeDef.description;
+    if (!def.description) def.description = "Suivez les consignes prévues par l’organisateur pour réaliser cette épreuve.";
+  });
   data.eventDefs = data.eventDefs.filter(def => data.events?.[def.id]);
   Object.keys(data.events || {}).forEach(id => {
     if (!data.eventDefs.some(def => def.id === id)) {
-      data.eventDefs.push({ id, name: id, short: id, rule: "", custom: true });
+      data.eventDefs.push({ id, name: id, short: id, description: "Suivez les consignes prévues par l’organisateur pour réaliser cette épreuve.", rule: "", custom: true });
     }
   });
   if (!data.enabled || typeof data.enabled !== "object") data.enabled = {};
@@ -451,8 +456,11 @@ function renderEventCreator() {
             </select>
           </label>
         </div>
-        <label style="margin-top:12px">Règles affichées
-          <textarea name="rule" rows="3" required placeholder="Expliquez brièvement le déroulement et le comptage des points."></textarea>
+        <label style="margin-top:12px">Comment jouer ?
+          <textarea name="description" rows="4" required placeholder="Décrivez le déroulement concret : objectif, matériel, actions des équipes et fin de la partie."></textarea>
+        </label>
+        <label style="margin-top:12px">Comptabilisation des points
+          <textarea name="rule" rows="3" required placeholder="Expliquez uniquement comment les points sont attribués."></textarea>
         </label>
       </section>
       <section class="card creator-options" id="creator-options">${creatorOptions("rank")}</section>
@@ -496,8 +504,16 @@ function renderEventEditor(id) {
   return `
     <div class="event-header">
       <button class="back-button" data-back-events aria-label="Retour">←</button>
-      <div><h2>${escapeHtml(def.name)}</h2><p>${escapeHtml(def.rule)}</p></div>
+      <div><h2>${escapeHtml(def.name)}</h2><p>${def.custom ? "Épreuve personnalisée" : "Épreuve des olympiades"}</p></div>
     </div>
+    <section class="game-explanation">
+      <span class="explanation-icon">?</span>
+      <div><h3>Comment jouer ?</h3><p>${escapeHtml(def.description)}</p></div>
+    </section>
+    <section class="scoring-explanation">
+      <span class="explanation-icon">+</span>
+      <div><h3>Comptabilisation des points</h3><p>${escapeHtml(def.rule)}</p></div>
+    </section>
     <section class="event-state-card ${enabled ? "is-active" : ""}">
       <div><strong>${enabled ? "Épreuve active" : "Épreuve désactivée"}</strong>
       <small>${enabled ? "Ses points comptent dans le classement." : "Les saisies sont conservées, mais les points ne comptent pas."}</small></div>
@@ -903,10 +919,11 @@ function customEventId(name) {
 
 function createCustomEvent(formData) {
   const name = String(formData.get("name") || "").trim();
+  const description = String(formData.get("description") || "").trim();
   const rule = String(formData.get("rule") || "").trim();
   const type = String(formData.get("type") || "manual");
-  if (!name || !rule) {
-    showToast("Le nom et les règles sont obligatoires");
+  if (!name || !description || !rule) {
+    showToast("Le nom, le déroulement et les points sont obligatoires");
     return;
   }
   const id = customEventId(name);
@@ -950,7 +967,7 @@ function createCustomEvent(formData) {
   }
 
   state.events[id] = event;
-  state.eventDefs.push({ id, name, short: name.slice(0, 24), rule, custom: true });
+  state.eventDefs.push({ id, name, short: name.slice(0, 24), description, rule, custom: true });
   state.enabled[id] = true;
   state.order.push(id);
   creatingEvent = false;

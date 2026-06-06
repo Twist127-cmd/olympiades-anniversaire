@@ -29,6 +29,11 @@ modèles :
 Les épreuves personnalisées peuvent ensuite être réorganisées, désactivées ou
 supprimées comme les autres.
 
+Chaque fiche d’épreuve affiche désormais deux encadrés avant la saisie :
+**Comment jouer ?** pour le déroulement et **Comptabilisation des points** pour
+le barème. Ces deux informations sont également demandées lors de la création
+d’une nouvelle épreuve.
+
 Les données sont sauvegardées automatiquement sur l’appareil. L’onglet
 **Réglages** permet aussi d’exporter une sauvegarde JSON dans Fichiers ou iCloud.
 
