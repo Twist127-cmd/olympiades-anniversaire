@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Olympiades">
+  <title>Olympiades Anniversaire</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">30 ANS · OLYMPIADES</p>
+        <h1 id="page-title">Classement</h1>
+      </div>
+      <button class="icon-button" id="fullscreen-btn" aria-label="Afficher en plein écran" title="Plein écran">
+        <span aria-hidden="true">↗</span>
+      </button>
+    </header>
+
+    <main id="app" class="main-content" aria-live="polite"></main>
+
+    <nav class="bottom-nav" aria-label="Navigation principale">
+      <button class="nav-item active" data-view="dashboard">
+        <span class="nav-icon">⌂</span>
+        <span>Classement</span>
+      </button>
+      <button class="nav-item" data-view="events">
+        <span class="nav-icon">◎</span>
+        <span>Épreuves</span>
+      </button>
+      <button class="nav-item" data-view="order">
+        <span class="nav-icon">↕</span>
+        <span>Ordre</span>
+      </button>
+      <button class="nav-item" data-view="settings">
+        <span class="nav-icon">⚙</span>
+        <span>Réglages</span>
+      </button>
+    </nav>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+  <input id="import-file" type="file" accept=".json,application/json" hidden>
+  <script src="app.js"></script>
+</body>
+</html>
