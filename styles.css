@@ -297,14 +297,16 @@ h2, h3, p { margin-top: 0; }
 .event-header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
 
 .score-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
   gap: 7px;
   margin-bottom: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .mini-score {
-  min-width: 0;
+  flex: 1 0 76px;
+  min-width: 76px;
   padding: 10px 5px;
   border-radius: 14px;
   text-align: center;
@@ -468,6 +470,96 @@ input:focus, select:focus {
   content: "";
 }
 
+.team-manager-intro {
+  position: relative;
+  margin-bottom: 13px;
+  padding-right: 92px;
+}
+
+.team-manager-intro h3 { margin-bottom: 7px; }
+.team-manager-intro p { margin-bottom: 0; line-height: 1.45; }
+
+.team-count {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  text-align: center;
+  place-content: center;
+}
+
+.team-count strong { font-size: 24px; line-height: 1; }
+.team-count span { margin-top: 3px; font-size: 9px; font-weight: 850; text-transform: uppercase; }
+.team-manager-list { display: grid; gap: 10px; }
+
+.team-manager-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 34px;
+  gap: 11px;
+  align-items: center;
+  padding: 14px;
+  border-left: 5px solid var(--team);
+}
+
+.team-manager-number {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  color: var(--team);
+  background: color-mix(in srgb, var(--team) 12%, white);
+  font-weight: 900;
+  place-items: center;
+}
+
+.team-manager-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 105px;
+  gap: 9px;
+}
+
+.color-control {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.color-control input {
+  flex: 0 0 auto;
+  width: 32px;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+}
+
+.color-control span { display: none; }
+
+.remove-team {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 11px;
+  color: #b91c1c;
+  background: #fee2e2;
+  font-size: 22px;
+}
+
+.remove-team:disabled { color: #94a3b8; background: #f1f5f9; }
+.add-team-button { margin-top: 14px; }
+.add-team-button:disabled { opacity: .45; }
+.team-limit { margin: 9px 0 0; color: var(--muted); font-size: 11px; text-align: center; }
+
 .bottom-nav {
   position: fixed;
   z-index: 30;
@@ -475,7 +567,7 @@ input:focus, select:focus {
   bottom: 0;
   left: max(0px, calc((100vw - 960px) / 2));
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   width: auto;
   min-height: calc(70px + var(--safe-bottom));
   padding: 7px 8px var(--safe-bottom);
@@ -494,7 +586,7 @@ input:focus, select:focus {
   border-radius: 15px;
   color: #64748b;
   background: transparent;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
 }
 
@@ -530,6 +622,11 @@ input:focus, select:focus {
   .field-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .rank-list { grid-template-columns: repeat(2, 1fr); }
   .event-list { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 430px) {
+  .team-manager-fields { grid-template-columns: 1fr 58px; }
+  .nav-icon { font-size: 19px; }
 }
 
 @media print {

@@ -1,11 +1,13 @@
 const STORAGE_KEY = "olympiades-anniversaire-v1";
 
-const TEAMS = [
-  { id: "CAIPI", color: "#ef4444" },
-  { id: "VIRGIN", color: "#eab308" },
-  { id: "VICHY", color: "#3b82f6" },
-  { id: "NAYVI", color: "#8b5cf6" }
+const DEFAULT_TEAMS = [
+  { id: "CAIPI", name: "CAIPI", color: "#ef4444" },
+  { id: "VIRGIN", name: "VIRGIN", color: "#eab308" },
+  { id: "VICHY", name: "VICHY", color: "#3b82f6" },
+  { id: "NAYVI", name: "NAYVI", color: "#8b5cf6" }
 ];
+
+const TEAM_COLORS = ["#ef4444", "#eab308", "#3b82f6", "#8b5cf6", "#10b981", "#f97316", "#ec4899", "#06b6d4", "#84cc16", "#6366f1"];
 
 const EVENT_DEFS = [
   { id: "race", name: "The Blinded Race + Rébus", short: "Blinded Race", rule: "Saisir le rang d’arrivée. 1er = 15, 2e = 10, 3e = 5, 4e = 0." },
@@ -22,7 +24,8 @@ const EVENT_DEFS = [
 ];
 
 const sampleData = {
-  version: 1,
+  version: 2,
+  teams: DEFAULT_TEAMS,
   order: EVENT_DEFS.map(event => event.id),
   events: {
     race: { type: "rank", ranks: { CAIPI: 1, VIRGIN: 2, VICHY: 3, NAYVI: 4 }, scale: [15, 10, 5, 0] },
@@ -119,8 +122,23 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function teams() {
+  return state.teams;
+}
+
+function migrateState(data) {
+  if (!Array.isArray(data.teams)) data.teams = clone(DEFAULT_TEAMS);
+  data.teams = data.teams.map((team, index) => ({
+    id: String(team.id || `TEAM_${index + 1}`),
+    name: String(team.name || team.id || `Équipe ${index + 1}`),
+    color: team.color || TEAM_COLORS[index % TEAM_COLORS.length]
+  }));
+  data.version = 2;
+  return data;
+}
+
 function blankState() {
-  const blank = clone(sampleData);
+  const blank = clone(state);
   Object.values(blank.events).forEach(event => {
     if (event.ranks) Object.keys(event.ranks).forEach(team => event.ranks[team] = null);
     if (event.penalties) Object.keys(event.penalties).forEach(team => event.penalties[team] = 0);
@@ -145,11 +163,11 @@ function blankState() {
 function loadState() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (stored?.events && Array.isArray(stored.order)) return stored;
+    if (stored?.events && Array.isArray(stored.order)) return migrateState(stored);
   } catch (error) {
     console.warn("Sauvegarde locale illisible", error);
   }
-  return clone(sampleData);
+  return migrateState(clone(sampleData));
 }
 
 function saveState(message = "") {
@@ -162,7 +180,7 @@ function eventDef(id) {
 }
 
 function emptyScores() {
-  return Object.fromEntries(TEAMS.map(team => [team.id, 0]));
+  return Object.fromEntries(teams().map(team => [team.id, 0]));
 }
 
 function num(value) {
@@ -177,14 +195,14 @@ function scoresFor(eventId) {
   if (!event) return scores;
 
   if (event.type === "rank") {
-    TEAMS.forEach(team => {
+    teams().forEach(team => {
       const rank = num(event.ranks[team.id]);
       scores[team.id] = rank >= 1 && rank <= event.scale.length ? event.scale[rank - 1] : 0;
     });
   }
 
   if (event.type === "penaltyRank") {
-    TEAMS.forEach(team => {
+    teams().forEach(team => {
       const rank = num(event.ranks[team.id]);
       const base = rank >= 1 && rank <= event.scale.length ? event.scale[rank - 1] : 0;
       scores[team.id] = base - (num(event.penalties[team.id]) || 0);
@@ -195,7 +213,7 @@ function scoresFor(eventId) {
     event.rounds.forEach(round => {
       const actual = num(round.actual);
       if (actual === null) return;
-      const valid = TEAMS
+      const valid = teams()
         .map(team => ({ id: team.id, value: num(round.estimates[team.id]) }))
         .filter(entry => entry.value !== null)
         .map(entry => ({ ...entry, gap: Math.abs(entry.value - actual) }));
@@ -209,7 +227,7 @@ function scoresFor(eventId) {
   }
 
   if (event.type === "quiz") {
-    TEAMS.forEach(team => {
+    teams().forEach(team => {
       scores[team.id] = event.answers.reduce((sum, answer) => sum + (Number(answer[team.id]) === 1 ? 2 : 0), 0);
     });
   }
@@ -224,7 +242,7 @@ function scoresFor(eventId) {
   }
 
   if (event.type === "taste") {
-    event.rounds.forEach(round => TEAMS.forEach(team => {
+    event.rounds.forEach(round => teams().forEach(team => {
       const answer = round[team.id];
       scores[team.id] += (answer.exact ? 5 : 0) + Math.max(0, num(answer.ingredients) || 0);
     }));
@@ -237,15 +255,15 @@ function totals() {
   const result = emptyScores();
   state.order.forEach(eventId => {
     const scores = scoresFor(eventId);
-    TEAMS.forEach(team => result[team.id] += scores[team.id]);
+    teams().forEach(team => result[team.id] += scores[team.id]);
   });
   return result;
 }
 
 function ranking() {
   const all = totals();
-  return TEAMS.map(team => ({ ...team, score: all[team.id] }))
-    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+  return teams().map(team => ({ ...team, score: all[team.id] }))
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
 
 function escapeHtml(value) {
@@ -269,14 +287,14 @@ function showToast(message) {
 }
 
 function teamStyle(teamId) {
-  return `--team:${TEAMS.find(team => team.id === teamId)?.color || "#64748b"}`;
+  return `--team:${teams().find(team => team.id === teamId)?.color || "#64748b"}`;
 }
 
 function scoreStrip(eventId) {
   const scores = scoresFor(eventId);
-  return `<div class="score-strip">${TEAMS.map(team => `
+  return `<div class="score-strip">${teams().map(team => `
     <div class="mini-score" style="${teamStyle(team.id)}">
-      <span>${team.id}</span><strong>${scores[team.id]}</strong>
+      <span>${escapeHtml(team.name)}</span><strong>${scores[team.id]}</strong>
     </div>`).join("")}</div>`;
 }
 
@@ -286,7 +304,7 @@ function renderDashboard() {
   return `
     <section class="hero-card">
       <p class="hero-label">En tête du classement</p>
-      <h2 class="hero-winner">${winner.id}</h2>
+      <h2 class="hero-winner">${escapeHtml(winner.name)}</h2>
       <p class="hero-score">${winner.score} points · ${winner.score - ranked[1].score} point${winner.score - ranked[1].score > 1 ? "s" : ""} d’avance</p>
     </section>
 
@@ -300,7 +318,7 @@ function renderDashboard() {
           <div class="rank-position">${index + 1}</div>
           <div>
             <div class="team-row" style="${teamStyle(team.id)}">
-              <span class="team-dot"></span><span class="team-name">${team.id}</span>
+              <span class="team-dot"></span><span class="team-name">${escapeHtml(team.name)}</span>
             </div>
             <div class="team-detail">${index === 0 ? "Leader" : `${winner.score - team.score} pts du leader`}</div>
           </div>
@@ -313,18 +331,18 @@ function renderDashboard() {
     </div>
     <section class="chart-card">
       <div class="chart-wrap">${progressChart()}</div>
-      <div class="legend">${TEAMS.map(team => `
-        <span class="legend-item" style="${teamStyle(team.id)}"><span class="team-dot"></span>${team.id}</span>`).join("")}
+      <div class="legend">${teams().map(team => `
+        <span class="legend-item" style="${teamStyle(team.id)}"><span class="team-dot"></span>${escapeHtml(team.name)}</span>`).join("")}
       </div>
     </section>`;
 }
 
 function progressChart() {
   const width = 760, height = 250, left = 38, top = 18, right = 16, bottom = 40;
-  const series = Object.fromEntries(TEAMS.map(team => [team.id, [0]]));
+  const series = Object.fromEntries(teams().map(team => [team.id, [0]]));
   state.order.forEach(eventId => {
     const eventScores = scoresFor(eventId);
-    TEAMS.forEach(team => {
+    teams().forEach(team => {
       const current = series[team.id];
       current.push(current[current.length - 1] + eventScores[team.id]);
     });
@@ -337,7 +355,7 @@ function progressChart() {
     return `<line x1="${left}" y1="${y(value)}" x2="${width-right}" y2="${y(value)}" stroke="#e2e8f0"/>
       <text x="${left-7}" y="${y(value)+4}" text-anchor="end" fill="#94a3b8" font-size="10">${value}</text>`;
   }).join("");
-  const lines = TEAMS.map(team => {
+  const lines = teams().map(team => {
     const points = series[team.id].map((value, index) => `${x(index)},${y(value)}`).join(" ");
     const dots = series[team.id].map((value, index) =>
       `<circle cx="${x(index)}" cy="${y(value)}" r="3.5" fill="${team.color}" stroke="#fff" stroke-width="2"/>`
@@ -363,7 +381,7 @@ function renderEvents() {
         const def = eventDef(id);
         const scores = scoresFor(id);
         const best = Math.max(...Object.values(scores));
-        const leaders = TEAMS.filter(team => scores[team.id] === best).map(team => team.id).join(" · ");
+        const leaders = teams().filter(team => scores[team.id] === best).map(team => team.name).join(" · ");
         return `<button class="event-card" data-open-event="${id}">
           <span class="event-number">${index + 1}</span>
           <span><strong>${def.name}</strong><small>${leaders} · ${best} pts</small></span>
@@ -393,14 +411,14 @@ function renderEventEditor(id) {
 }
 
 function rankOptions(selected) {
-  return `<option value="">—</option>${[1,2,3,4].map(rank =>
+  return `<option value="">—</option>${Array.from({ length: teams().length }, (_, index) => index + 1).map(rank =>
     `<option value="${rank}" ${Number(selected) === rank ? "selected" : ""}>${rank}${rank === 1 ? "er" : "e"}</option>`
   ).join("")}`;
 }
 
 function rankEditor(id, event) {
   return `<section class="card"><div class="field-grid">
-    ${TEAMS.map(team => `<label class="field-team" style="${teamStyle(team.id)}">${team.id}
+    ${teams().map(team => `<label class="field-team" style="${teamStyle(team.id)}">${escapeHtml(team.name)}
       <select data-event="${id}" data-team="${team.id}" data-field="rank">${rankOptions(event.ranks[team.id])}</select>
     </label>`).join("")}
   </div></section>`;
@@ -408,8 +426,8 @@ function rankEditor(id, event) {
 
 function penaltyRankEditor(id, event) {
   return `<section class="card"><div class="field-grid">
-    ${TEAMS.map(team => `<div class="field-team" style="${teamStyle(team.id)}">
-      <label>${team.id} · rang<select data-event="${id}" data-team="${team.id}" data-field="rank">${rankOptions(event.ranks[team.id])}</select></label>
+    ${teams().map(team => `<div class="field-team" style="${teamStyle(team.id)}">
+      <label>${escapeHtml(team.name)} · rang<select data-event="${id}" data-team="${team.id}" data-field="rank">${rankOptions(event.ranks[team.id])}</select></label>
       <label style="margin-top:9px">Verres perdus<input type="number" min="0" inputmode="numeric" value="${inputValue(event.penalties[team.id])}" data-event="${id}" data-team="${team.id}" data-field="penalty"></label>
     </div>`).join("")}
   </div></section>`;
@@ -423,7 +441,7 @@ function estimateEditor(id, event) {
         <input type="number" step="any" inputmode="decimal" value="${inputValue(round.actual)}" data-event="${id}" data-round="${roundIndex}" data-field="actual">
       </label>
       <div class="field-grid four" style="margin-top:12px">
-        ${TEAMS.map(team => `<label class="field-team" style="${teamStyle(team.id)}">${team.id}
+        ${teams().map(team => `<label class="field-team" style="${teamStyle(team.id)}">${escapeHtml(team.name)}
           <input type="number" step="any" inputmode="decimal" value="${inputValue(round.estimates[team.id])}" data-event="${id}" data-round="${roundIndex}" data-team="${team.id}" data-field="estimate">
         </label>`).join("")}
       </div>
@@ -435,7 +453,7 @@ function quizEditor(id, event) {
     <section class="round-card">
       <div class="round-title"><span>Question ${index + 1}</span><span class="muted">2 pts</span></div>
       <div class="field-grid four">
-        ${TEAMS.map(team => `<label class="field-team" style="${teamStyle(team.id)}">${team.id}
+        ${teams().map(team => `<label class="field-team" style="${teamStyle(team.id)}">${escapeHtml(team.name)}
           <select data-event="${id}" data-round="${index}" data-team="${team.id}" data-field="answer">
             <option value="0" ${Number(answer[team.id]) === 0 ? "selected" : ""}>Mauvaise</option>
             <option value="1" ${Number(answer[team.id]) === 1 ? "selected" : ""}>Bonne</option>
@@ -446,8 +464,8 @@ function quizEditor(id, event) {
 }
 
 function teamOptions(selected, allowEmpty = true) {
-  return `${allowEmpty ? '<option value="">Aucune</option>' : ""}${TEAMS.map(team =>
-    `<option value="${team.id}" ${selected === team.id ? "selected" : ""}>${team.id}</option>`
+  return `${allowEmpty ? '<option value="">Aucune</option>' : ""}${teams().map(team =>
+    `<option value="${team.id}" ${selected === team.id ? "selected" : ""}>${escapeHtml(team.name)}</option>`
   ).join("")}`;
 }
 
@@ -468,8 +486,8 @@ function tasteEditor(id, event) {
     <section class="round-card">
       <div class="round-title"><span>Saveur ${index + 1}</span><span class="muted">5 pts + ingrédients</span></div>
       <div class="field-grid">
-        ${TEAMS.map(team => `<div class="field-team" style="${teamStyle(team.id)}">
-          <label>${team.id} · goût exact
+        ${teams().map(team => `<div class="field-team" style="${teamStyle(team.id)}">
+          <label>${escapeHtml(team.name)} · goût exact
             <select data-event="${id}" data-round="${index}" data-team="${team.id}" data-field="exact">
               <option value="0" ${!round[team.id].exact ? "selected" : ""}>Non</option>
               <option value="1" ${round[team.id].exact ? "selected" : ""}>Oui</option>
@@ -500,6 +518,35 @@ function renderOrder() {
           </div>
         </article>`).join("")}
     </section>`;
+}
+
+function renderTeams() {
+  return `
+    <section class="card team-manager-intro">
+      <h3>Gestion des équipes</h3>
+      <p class="muted">Modifiez les noms et les couleurs, ou adaptez le nombre d’équipes. Les scores déjà saisis restent associés à la bonne équipe.</p>
+      <div class="team-count"><strong>${teams().length}</strong><span>équipe${teams().length > 1 ? "s" : ""}</span></div>
+    </section>
+    <section class="team-manager-list">
+      ${teams().map((team, index) => `
+        <article class="card team-manager-card" style="${teamStyle(team.id)}">
+          <div class="team-manager-number">${index + 1}</div>
+          <div class="team-manager-fields">
+            <label>Nom de l’équipe
+              <input type="text" maxlength="24" value="${inputValue(team.name)}" data-team-setting="${team.id}" data-team-property="name">
+            </label>
+            <label>Couleur
+              <span class="color-control">
+                <input type="color" value="${escapeHtml(team.color)}" data-team-setting="${team.id}" data-team-property="color">
+                <span>${escapeHtml(team.color.toUpperCase())}</span>
+              </span>
+            </label>
+          </div>
+          <button class="remove-team" data-remove-team="${team.id}" ${teams().length <= 2 ? "disabled" : ""} aria-label="Supprimer ${escapeHtml(team.name)}">×</button>
+        </article>`).join("")}
+    </section>
+    <button class="button wide add-team-button" id="add-team-btn" ${teams().length >= 10 ? "disabled" : ""}>+ Ajouter une équipe</button>
+    <p class="team-limit">Minimum 2 · Maximum 10 équipes</p>`;
 }
 
 function renderSettings() {
@@ -535,12 +582,13 @@ function renderSettings() {
 
 function render() {
   const app = document.querySelector("#app");
-  const titles = { dashboard: "Classement", events: currentEvent ? eventDef(currentEvent).short : "Épreuves", order: "Ordre des épreuves", settings: "Réglages" };
+  const titles = { dashboard: "Classement", events: currentEvent ? eventDef(currentEvent).short : "Épreuves", order: "Ordre des épreuves", teams: "Équipes", settings: "Réglages" };
   document.querySelector("#page-title").textContent = titles[currentView];
 
   if (currentView === "dashboard") app.innerHTML = renderDashboard();
   if (currentView === "events") app.innerHTML = currentEvent ? renderEventEditor(currentEvent) : renderEvents();
   if (currentView === "order") app.innerHTML = renderOrder();
+  if (currentView === "teams") app.innerHTML = renderTeams();
   if (currentView === "settings") app.innerHTML = renderSettings();
 
   document.querySelectorAll(".nav-item").forEach(button => {
@@ -580,6 +628,15 @@ document.querySelector("#app").addEventListener("click", event => {
     moveEvent(move.dataset.move, Number(move.dataset.direction));
     return;
   }
+  if (event.target.closest("#add-team-btn")) {
+    addTeam();
+    return;
+  }
+  const removeTeamButton = event.target.closest("[data-remove-team]");
+  if (removeTeamButton) {
+    removeTeam(removeTeamButton.dataset.removeTeam);
+    return;
+  }
   if (event.target.closest("#export-btn")) exportData();
   if (event.target.closest("#import-btn")) document.querySelector("#import-file").click();
   if (event.target.closest("#blank-btn") && confirm("Commencer une nouvelle partie ? Les données actuelles seront remplacées.")) {
@@ -595,12 +652,78 @@ document.querySelector("#app").addEventListener("click", event => {
 });
 
 document.querySelector("#app").addEventListener("change", event => {
+  const teamSetting = event.target.closest("[data-team-setting]");
+  if (teamSetting) {
+    updateTeamSetting(teamSetting);
+    return;
+  }
   const input = event.target.closest("[data-event]");
   if (!input) return;
   updateField(input);
   saveState();
   render();
 });
+
+function updateTeamSetting(input) {
+  const team = teams().find(item => item.id === input.dataset.teamSetting);
+  if (!team) return;
+  if (input.dataset.teamProperty === "name") {
+    const name = input.value.trim();
+    if (!name) {
+      showToast("Le nom ne peut pas être vide");
+      render();
+      return;
+    }
+    team.name = name;
+  }
+  if (input.dataset.teamProperty === "color") team.color = input.value;
+  saveState("Équipe mise à jour");
+  render();
+}
+
+function addTeam() {
+  if (teams().length >= 10) return;
+  let number = teams().length + 1;
+  let id = `TEAM_${number}`;
+  while (teams().some(team => team.id === id)) {
+    number += 1;
+    id = `TEAM_${number}`;
+  }
+  state.teams.push({
+    id,
+    name: `Équipe ${state.teams.length + 1}`,
+    color: TEAM_COLORS[state.teams.length % TEAM_COLORS.length]
+  });
+  Object.values(state.events).forEach(event => {
+    if (event.ranks) event.ranks[id] = null;
+    if (event.penalties) event.penalties[id] = 0;
+    if (event.type === "estimate") event.rounds.forEach(round => round.estimates[id] = null);
+    if (event.type === "quiz") event.answers.forEach(answer => answer[id] = 0);
+    if (event.type === "taste") event.rounds.forEach(round => round[id] = { exact: false, ingredients: 0 });
+  });
+  saveState("Équipe ajoutée");
+  render();
+}
+
+function removeTeam(teamId) {
+  if (teams().length <= 2) return;
+  const team = teams().find(item => item.id === teamId);
+  if (!team || !confirm(`Supprimer l’équipe « ${team.name} » et tous ses résultats ?`)) return;
+  state.teams = teams().filter(item => item.id !== teamId);
+  Object.values(state.events).forEach(event => {
+    if (event.ranks) delete event.ranks[teamId];
+    if (event.penalties) delete event.penalties[teamId];
+    if (event.type === "estimate") event.rounds.forEach(round => delete round.estimates[teamId]);
+    if (event.type === "quiz") event.answers.forEach(answer => delete answer[teamId]);
+    if (event.type === "taste") event.rounds.forEach(round => delete round[teamId]);
+    if (event.type === "winners") event.winners.forEach(winner => {
+      if (winner.team1 === teamId) winner.team1 = "";
+      if (winner.team2 === teamId) winner.team2 = "";
+    });
+  });
+  saveState("Équipe supprimée");
+  render();
+}
 
 function updateField(input) {
   const { event: eventId, field, team } = input.dataset;
@@ -673,7 +796,7 @@ document.querySelector("#import-file").addEventListener("change", async event =>
   try {
     const imported = JSON.parse(await file.text());
     if (!imported.events || !Array.isArray(imported.order)) throw new Error("Format invalide");
-    state = { version: imported.version || 1, events: imported.events, order: imported.order };
+    state = migrateState({ version: imported.version || 1, teams: imported.teams, events: imported.events, order: imported.order });
     saveState("Sauvegarde restaurée");
     render();
   } catch {

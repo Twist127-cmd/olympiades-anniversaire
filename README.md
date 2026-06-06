@@ -9,6 +9,9 @@ Application web mobile de suivi des scores des 11 épreuves.
 3. Saisir les résultats depuis l’onglet **Épreuves**.
 4. Consulter ou capturer le classement depuis l’onglet **Classement**.
 
+L’onglet **Équipes** permet d’ajouter ou supprimer des équipes, de modifier
+leurs noms et de choisir leurs couleurs. Deux à dix équipes peuvent participer.
+
 Les données sont sauvegardées automatiquement sur l’appareil. L’onglet
 **Réglages** permet aussi d’exporter une sauvegarde JSON dans Fichiers ou iCloud.
 
