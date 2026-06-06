@@ -34,7 +34,7 @@ body {
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 
 .app-shell {
@@ -248,18 +248,32 @@ h2, h3, p { margin-top: 0; }
 }
 
 .event-card {
-  display: grid;
-  grid-template-columns: 46px 1fr auto;
-  gap: 12px;
-  align-items: center;
+  position: relative;
+  display: flex;
   width: 100%;
-  padding: 14px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 19px;
   text-align: left;
   color: var(--ink);
   background: var(--surface);
   box-shadow: 0 5px 18px rgba(15,23,42,.04);
+  transition: opacity .2s ease, background .2s ease;
+}
+
+.event-open {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  padding: 14px 67px 14px 14px;
+  border: 0;
+  border-radius: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
 }
 
 .event-number {
@@ -276,6 +290,50 @@ h2, h3, p { margin-top: 0; }
 .event-card strong { display: block; line-height: 1.2; }
 .event-card small { color: var(--muted); }
 .chevron { color: #94a3b8; font-size: 22px; }
+.event-disabled { opacity: .58; background: #f8fafc; }
+
+.event-switch {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  display: block;
+  transform: translateY(-50%);
+}
+
+.event-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.event-switch span {
+  position: relative;
+  display: block;
+  width: 43px;
+  height: 25px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: .2s ease;
+}
+
+.event-switch span::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(15,23,42,.22);
+  content: "";
+  transition: .2s ease;
+}
+
+.event-switch input:checked + span { background: var(--success); }
+.event-switch input:checked + span::after { transform: translateX(18px); }
+.custom-badge { color: var(--brand); font-size: 9px; text-transform: uppercase; }
+.create-event-button { margin-bottom: 13px; }
 
 .event-header {
   display: flex;
@@ -370,7 +428,21 @@ input, select {
   padding: 10px 12px;
 }
 
-input:focus, select:focus {
+textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 13px;
+  outline: none;
+  color: var(--ink);
+  background: #fff;
+  font-size: 16px;
+  line-height: 1.4;
+  padding: 11px 12px;
+}
+
+input:focus, select:focus, textarea:focus {
   border-color: #8b5cf6;
   box-shadow: 0 0 0 3px rgba(139,92,246,.13);
 }
@@ -419,6 +491,8 @@ input:focus, select:focus {
   border-radius: 17px;
   background: var(--surface);
 }
+
+.order-item small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
 
 .drag-handle {
   display: grid;
@@ -559,6 +633,36 @@ input:focus, select:focus {
 .add-team-button { margin-top: 14px; }
 .add-team-button:disabled { opacity: .45; }
 .team-limit { margin: 9px 0 0; color: var(--muted); font-size: 11px; text-align: center; }
+
+.event-state-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 13px;
+  padding: 13px 70px 13px 15px;
+  border: 1px solid #fecaca;
+  border-radius: 17px;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.event-state-card.is-active {
+  border-color: #a7f3d0;
+  color: #065f46;
+  background: #ecfdf5;
+}
+
+.event-state-card strong, .event-state-card small { display: block; }
+.event-state-card small { margin-top: 2px; color: inherit; font-size: 11px; opacity: .8; }
+.event-state-card .event-switch { right: 15px; }
+.creator-stack { display: grid; gap: 13px; }
+.creator-options h3 { margin-bottom: 5px; }
+.creator-summary { border-color: #c4b5fd; background: #f5f3ff; }
+.creator-summary strong { color: var(--brand-dark); }
+.creator-summary p { margin: 7px 0 0; color: #5b21b6; font-size: 13px; line-height: 1.45; }
+.custom-delete { margin-top: 10px; }
 
 .bottom-nav {
   position: fixed;

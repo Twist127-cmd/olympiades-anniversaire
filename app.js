@@ -24,8 +24,10 @@ const EVENT_DEFS = [
 ];
 
 const sampleData = {
-  version: 2,
+  version: 3,
   teams: DEFAULT_TEAMS,
+  eventDefs: EVENT_DEFS,
+  enabled: Object.fromEntries(EVENT_DEFS.map(event => [event.id, true])),
   order: EVENT_DEFS.map(event => event.id),
   events: {
     race: { type: "rank", ranks: { CAIPI: 1, VIRGIN: 2, VICHY: 3, NAYVI: 4 }, scale: [15, 10, 5, 0] },
@@ -116,6 +118,7 @@ const sampleData = {
 let state = loadState();
 let currentView = "dashboard";
 let currentEvent = null;
+let creatingEvent = false;
 let toastTimer;
 
 function clone(value) {
@@ -133,7 +136,22 @@ function migrateState(data) {
     name: String(team.name || team.id || `Équipe ${index + 1}`),
     color: team.color || TEAM_COLORS[index % TEAM_COLORS.length]
   }));
-  data.version = 2;
+  if (!Array.isArray(data.eventDefs)) data.eventDefs = clone(EVENT_DEFS);
+  data.eventDefs = data.eventDefs.filter(def => data.events?.[def.id]);
+  Object.keys(data.events || {}).forEach(id => {
+    if (!data.eventDefs.some(def => def.id === id)) {
+      data.eventDefs.push({ id, name: id, short: id, rule: "", custom: true });
+    }
+  });
+  if (!data.enabled || typeof data.enabled !== "object") data.enabled = {};
+  data.eventDefs.forEach(def => {
+    if (data.enabled[def.id] === undefined) data.enabled[def.id] = true;
+  });
+  data.order = data.order.filter(id => data.events[id]);
+  data.eventDefs.forEach(def => {
+    if (!data.order.includes(def.id)) data.order.push(def.id);
+  });
+  data.version = 3;
   return data;
 }
 
@@ -147,6 +165,7 @@ function blankState() {
       Object.keys(round.estimates).forEach(team => round.estimates[team] = null);
     });
     if (event.answers) event.answers.forEach(answer => Object.keys(answer).forEach(team => answer[team] = 0));
+    if (event.type === "manual") Object.keys(event.scores).forEach(team => event.scores[team] = 0);
     if (event.winners) event.winners.forEach(winner => {
       winner.participant = "";
       winner.team1 = "";
@@ -176,7 +195,11 @@ function saveState(message = "") {
 }
 
 function eventDef(id) {
-  return EVENT_DEFS.find(event => event.id === id);
+  return state.eventDefs.find(event => event.id === id);
+}
+
+function activeOrder() {
+  return state.order.filter(id => state.enabled[id] !== false);
 }
 
 function emptyScores() {
@@ -220,15 +243,15 @@ function scoresFor(eventId) {
       if (!valid.length) return;
       const minGap = Math.min(...valid.map(entry => entry.gap));
       valid.forEach(entry => {
-        if (Math.abs(entry.gap - minGap) < 1e-9) scores[entry.id] += 5;
-        if (entry.gap < 1e-9) scores[entry.id] += 20;
+        if (Math.abs(entry.gap - minGap) < 1e-9) scores[entry.id] += Number(event.closestPoints ?? 5);
+        if (entry.gap < 1e-9) scores[entry.id] += Number(event.exactBonus ?? 20);
       });
     });
   }
 
   if (event.type === "quiz") {
     teams().forEach(team => {
-      scores[team.id] = event.answers.reduce((sum, answer) => sum + (Number(answer[team.id]) === 1 ? 2 : 0), 0);
+      scores[team.id] = event.answers.reduce((sum, answer) => sum + (Number(answer[team.id]) === 1 ? Number(event.pointsPerAnswer ?? 2) : 0), 0);
     });
   }
 
@@ -248,12 +271,16 @@ function scoresFor(eventId) {
     }));
   }
 
+  if (event.type === "manual") {
+    teams().forEach(team => scores[team.id] = num(event.scores[team.id]) || 0);
+  }
+
   return scores;
 }
 
 function totals() {
   const result = emptyScores();
-  state.order.forEach(eventId => {
+  activeOrder().forEach(eventId => {
     const scores = scoresFor(eventId);
     teams().forEach(team => result[team.id] += scores[team.id]);
   });
@@ -340,7 +367,8 @@ function renderDashboard() {
 function progressChart() {
   const width = 760, height = 250, left = 38, top = 18, right = 16, bottom = 40;
   const series = Object.fromEntries(teams().map(team => [team.id, [0]]));
-  state.order.forEach(eventId => {
+  const activeEvents = activeOrder();
+  activeEvents.forEach(eventId => {
     const eventScores = scoresFor(eventId);
     teams().forEach(team => {
       const current = series[team.id];
@@ -348,7 +376,7 @@ function progressChart() {
     });
   });
   const max = Math.max(10, ...Object.values(series).flat());
-  const x = index => left + index * ((width - left - right) / Math.max(1, state.order.length));
+  const x = index => left + index * ((width - left - right) / Math.max(1, activeEvents.length));
   const y = value => top + (max - value) * ((height - top - bottom) / max);
   const grid = [0, .25, .5, .75, 1].map(part => {
     const value = Math.round(max * part);
@@ -362,7 +390,7 @@ function progressChart() {
     ).join("");
     return `<polyline points="${points}" fill="none" stroke="${team.color}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
   }).join("");
-  const labels = state.order.map((id, index) =>
+  const labels = activeEvents.map((id, index) =>
     `<text x="${x(index + 1)}" y="${height-16}" text-anchor="middle" fill="#64748b" font-size="10">${index + 1}</text>`
   ).join("");
   return `<svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Évolution cumulée des scores">
@@ -372,33 +400,109 @@ function progressChart() {
 }
 
 function renderEvents() {
+  const activeCount = activeOrder().length;
   return `
     <div class="section-heading" style="margin-top:4px">
-      <div><h2>Les 11 épreuves</h2><p>Ouvrez une épreuve pour saisir ses résultats</p></div>
+      <div><h2>Programme des épreuves</h2><p>${activeCount} active${activeCount > 1 ? "s" : ""} sur ${state.order.length}</p></div>
     </div>
+    <button class="button wide create-event-button" id="create-event-btn">+ Créer une nouvelle épreuve</button>
     <section class="event-list">
       ${state.order.map((id, index) => {
         const def = eventDef(id);
         const scores = scoresFor(id);
         const best = Math.max(...Object.values(scores));
         const leaders = teams().filter(team => scores[team.id] === best).map(team => team.name).join(" · ");
-        return `<button class="event-card" data-open-event="${id}">
-          <span class="event-number">${index + 1}</span>
-          <span><strong>${def.name}</strong><small>${leaders} · ${best} pts</small></span>
-          <span class="chevron">›</span>
-        </button>`;
+        const enabled = state.enabled[id] !== false;
+        return `<article class="event-card ${enabled ? "" : "event-disabled"}">
+          <button class="event-open" data-open-event="${id}">
+            <span class="event-number">${index + 1}</span>
+            <span><strong>${escapeHtml(def.name)}</strong>
+              <small>${def.custom ? '<b class="custom-badge">Perso</b> · ' : ""}${enabled ? `${escapeHtml(leaders)} · ${best} pts` : "Désactivée"}</small>
+            </span>
+            <span class="chevron">›</span>
+          </button>
+          <label class="event-switch" title="${enabled ? "Désactiver" : "Activer"}">
+            <input type="checkbox" data-toggle-event="${id}" ${enabled ? "checked" : ""}>
+            <span></span>
+          </label>
+        </article>`;
       }).join("")}
     </section>`;
+}
+
+function renderEventCreator() {
+  return `
+    <div class="event-header">
+      <button class="back-button" data-cancel-create aria-label="Retour">←</button>
+      <div><h2>Nouvelle épreuve</h2><p>Choisissez un modèle, puis adaptez simplement son barème.</p></div>
+    </div>
+    <form id="event-creator-form" class="creator-stack">
+      <section class="card">
+        <div class="field-grid">
+          <label>Nom de l’épreuve
+            <input name="name" maxlength="50" required placeholder="Ex. Course en sac">
+          </label>
+          <label>Modèle de calcul
+            <select name="type" id="creator-type">
+              <option value="rank">Classement</option>
+              <option value="estimate">Estimation au plus proche</option>
+              <option value="quiz">Quiz / bonnes réponses</option>
+              <option value="manual">Points libres</option>
+            </select>
+          </label>
+        </div>
+        <label style="margin-top:12px">Règles affichées
+          <textarea name="rule" rows="3" required placeholder="Expliquez brièvement le déroulement et le comptage des points."></textarea>
+        </label>
+      </section>
+      <section class="card creator-options" id="creator-options">${creatorOptions("rank")}</section>
+      <section class="card creator-summary">
+        <strong>Comment ça marche ?</strong>
+        <p id="creator-help">Vous saisirez le classement de chaque équipe. Le barème attribuera automatiquement les points.</p>
+      </section>
+      <button class="button wide" type="submit">Créer et ouvrir l’épreuve</button>
+      <button class="button secondary wide" type="button" data-cancel-create>Annuler</button>
+    </form>`;
+}
+
+function creatorOptions(type) {
+  if (type === "rank") return `
+    <h3>Barème du classement</h3>
+    <p class="muted">Entrez les points du 1er au dernier, séparés par des virgules.</p>
+    <label>Points par position<input name="scale" value="15, 10, 5, 0" required></label>`;
+  if (type === "estimate") return `
+    <h3>Réglage des estimations</h3>
+    <div class="field-grid">
+      <label>Nombre de manches<input type="number" name="rounds" min="1" max="30" value="3" required></label>
+      <label>Unité<input name="unit" maxlength="8" value="m" placeholder="m, g, €, s…"></label>
+      <label>Points au plus proche<input type="number" name="closestPoints" value="5" required></label>
+      <label>Bonus valeur exacte<input type="number" name="exactBonus" value="20" required></label>
+    </div>`;
+  if (type === "quiz") return `
+    <h3>Réglage du quiz</h3>
+    <div class="field-grid">
+      <label>Nombre de questions<input type="number" name="questions" min="1" max="50" value="10" required></label>
+      <label>Points par bonne réponse<input type="number" name="pointsPerAnswer" value="2" required></label>
+    </div>`;
+  return `
+    <h3>Points libres</h3>
+    <p class="muted">Un champ de score sera affiché pour chaque équipe. Idéal pour une règle spéciale ou un jeu ponctuel.</p>`;
 }
 
 function renderEventEditor(id) {
   const def = eventDef(id);
   const event = state.events[id];
+  const enabled = state.enabled[id] !== false;
   return `
     <div class="event-header">
       <button class="back-button" data-back-events aria-label="Retour">←</button>
-      <div><h2>${def.name}</h2><p>${def.rule}</p></div>
+      <div><h2>${escapeHtml(def.name)}</h2><p>${escapeHtml(def.rule)}</p></div>
     </div>
+    <section class="event-state-card ${enabled ? "is-active" : ""}">
+      <div><strong>${enabled ? "Épreuve active" : "Épreuve désactivée"}</strong>
+      <small>${enabled ? "Ses points comptent dans le classement." : "Les saisies sont conservées, mais les points ne comptent pas."}</small></div>
+      <label class="event-switch"><input type="checkbox" data-toggle-event="${id}" ${enabled ? "checked" : ""}><span></span></label>
+    </section>
     ${scoreStrip(id)}
     ${event.type === "rank" ? rankEditor(id, event) : ""}
     ${event.type === "penaltyRank" ? penaltyRankEditor(id, event) : ""}
@@ -406,8 +510,10 @@ function renderEventEditor(id) {
     ${event.type === "quiz" ? quizEditor(id, event) : ""}
     ${event.type === "winners" ? winnersEditor(id, event) : ""}
     ${event.type === "taste" ? tasteEditor(id, event) : ""}
+    ${event.type === "manual" ? manualEditor(id, event) : ""}
     <div class="spacer"></div>
-    <button class="button secondary wide" data-back-events>Terminer la saisie</button>`;
+    <button class="button secondary wide" data-back-events>Terminer la saisie</button>
+    ${def.custom ? `<button class="button danger wide custom-delete" data-delete-event="${id}">Supprimer cette épreuve</button>` : ""}`;
 }
 
 function rankOptions(selected) {
@@ -451,7 +557,7 @@ function estimateEditor(id, event) {
 function quizEditor(id, event) {
   return event.answers.map((answer, index) => `
     <section class="round-card">
-      <div class="round-title"><span>Question ${index + 1}</span><span class="muted">2 pts</span></div>
+      <div class="round-title"><span>Question ${index + 1}</span><span class="muted">${event.pointsPerAnswer ?? 2} pts</span></div>
       <div class="field-grid four">
         ${teams().map(team => `<label class="field-team" style="${teamStyle(team.id)}">${escapeHtml(team.name)}
           <select data-event="${id}" data-round="${index}" data-team="${team.id}" data-field="answer">
@@ -461,6 +567,16 @@ function quizEditor(id, event) {
         </label>`).join("")}
       </div>
     </section>`).join("");
+}
+
+function manualEditor(id, event) {
+  return `<section class="card">
+    <div class="field-grid">
+      ${teams().map(team => `<label class="field-team" style="${teamStyle(team.id)}">${escapeHtml(team.name)}
+        <input type="number" step="any" inputmode="decimal" value="${inputValue(event.scores[team.id])}" data-event="${id}" data-team="${team.id}" data-field="manualScore">
+      </label>`).join("")}
+    </div>
+  </section>`;
 }
 
 function teamOptions(selected, allowEmpty = true) {
@@ -509,9 +625,9 @@ function renderOrder() {
     </section>
     <section class="order-list">
       ${state.order.map((id, index) => `
-        <article class="order-item" draggable="true" data-order-id="${id}">
+        <article class="order-item ${state.enabled[id] === false ? "event-disabled" : ""}" draggable="true" data-order-id="${id}">
           <span class="drag-handle">≡</span>
-          <div><strong>${index + 1}. ${eventDef(id).name}</strong></div>
+          <div><strong>${index + 1}. ${escapeHtml(eventDef(id).name)}</strong><small>${state.enabled[id] === false ? "Désactivée" : "Active"}</small></div>
           <div class="order-controls">
             <button data-move="${id}" data-direction="-1" ${index === 0 ? "disabled" : ""} aria-label="Monter">↑</button>
             <button data-move="${id}" data-direction="1" ${index === state.order.length - 1 ? "disabled" : ""} aria-label="Descendre">↓</button>
@@ -559,7 +675,7 @@ function renderSettings() {
       </article>
       <article class="card setting-card">
         <h3>Exporter ou restaurer</h3>
-        <p>Conservez une copie dans Fichiers ou iCloud. Le fichier contient les résultats et l’ordre des épreuves.</p>
+        <p>Conservez une copie dans Fichiers ou iCloud. Le fichier contient les équipes, les résultats, les épreuves personnalisées et leur activation.</p>
         <div class="button-row">
           <button class="button" id="export-btn">Exporter</button>
           <button class="button secondary" id="import-btn">Importer</button>
@@ -582,11 +698,11 @@ function renderSettings() {
 
 function render() {
   const app = document.querySelector("#app");
-  const titles = { dashboard: "Classement", events: currentEvent ? eventDef(currentEvent).short : "Épreuves", order: "Ordre des épreuves", teams: "Équipes", settings: "Réglages" };
+  const titles = { dashboard: "Classement", events: creatingEvent ? "Créer une épreuve" : currentEvent ? eventDef(currentEvent).short : "Épreuves", order: "Ordre des épreuves", teams: "Équipes", settings: "Réglages" };
   document.querySelector("#page-title").textContent = titles[currentView];
 
   if (currentView === "dashboard") app.innerHTML = renderDashboard();
-  if (currentView === "events") app.innerHTML = currentEvent ? renderEventEditor(currentEvent) : renderEvents();
+  if (currentView === "events") app.innerHTML = creatingEvent ? renderEventCreator() : currentEvent ? renderEventEditor(currentEvent) : renderEvents();
   if (currentView === "order") app.innerHTML = renderOrder();
   if (currentView === "teams") app.innerHTML = renderTeams();
   if (currentView === "settings") app.innerHTML = renderSettings();
@@ -599,7 +715,10 @@ function render() {
 
 function navigate(view) {
   currentView = view;
-  if (view !== "events") currentEvent = null;
+  if (view !== "events") {
+    currentEvent = null;
+    creatingEvent = false;
+  }
   window.scrollTo({ top: 0, behavior: "smooth" });
   render();
 }
@@ -612,6 +731,7 @@ document.querySelector(".bottom-nav").addEventListener("click", event => {
 document.querySelector("#app").addEventListener("click", event => {
   const open = event.target.closest("[data-open-event]");
   if (open) {
+    creatingEvent = false;
     currentEvent = open.dataset.openEvent;
     render();
     window.scrollTo(0, 0);
@@ -619,8 +739,26 @@ document.querySelector("#app").addEventListener("click", event => {
   }
   if (event.target.closest("[data-back-events]")) {
     currentEvent = null;
+    creatingEvent = false;
     render();
     window.scrollTo(0, 0);
+    return;
+  }
+  if (event.target.closest("#create-event-btn")) {
+    creatingEvent = true;
+    currentEvent = null;
+    render();
+    window.scrollTo(0, 0);
+    return;
+  }
+  if (event.target.closest("[data-cancel-create]")) {
+    creatingEvent = false;
+    render();
+    return;
+  }
+  const deleteEventButton = event.target.closest("[data-delete-event]");
+  if (deleteEventButton) {
+    deleteCustomEvent(deleteEventButton.dataset.deleteEvent);
     return;
   }
   const move = event.target.closest("[data-move]");
@@ -652,6 +790,25 @@ document.querySelector("#app").addEventListener("click", event => {
 });
 
 document.querySelector("#app").addEventListener("change", event => {
+  const toggle = event.target.closest("[data-toggle-event]");
+  if (toggle) {
+    state.enabled[toggle.dataset.toggleEvent] = toggle.checked;
+    saveState(toggle.checked ? "Épreuve activée" : "Épreuve désactivée");
+    render();
+    return;
+  }
+  if (event.target.id === "creator-type") {
+    const options = document.querySelector("#creator-options");
+    options.innerHTML = creatorOptions(event.target.value);
+    const help = {
+      rank: "Vous saisirez le classement de chaque équipe. Le barème attribuera automatiquement les points.",
+      estimate: "Vous saisirez une valeur réelle et les estimations. L’application identifiera automatiquement la ou les équipes les plus proches.",
+      quiz: "Pour chaque question, choisissez bonne ou mauvaise réponse. Les points seront totalisés automatiquement.",
+      manual: "Vous saisirez directement le score final de chaque équipe. C’est le modèle le plus souple."
+    };
+    document.querySelector("#creator-help").textContent = help[event.target.value];
+    return;
+  }
   const teamSetting = event.target.closest("[data-team-setting]");
   if (teamSetting) {
     updateTeamSetting(teamSetting);
@@ -662,6 +819,12 @@ document.querySelector("#app").addEventListener("change", event => {
   updateField(input);
   saveState();
   render();
+});
+
+document.querySelector("#app").addEventListener("submit", event => {
+  if (event.target.id !== "event-creator-form") return;
+  event.preventDefault();
+  createCustomEvent(new FormData(event.target));
 });
 
 function updateTeamSetting(input) {
@@ -700,6 +863,7 @@ function addTeam() {
     if (event.type === "estimate") event.rounds.forEach(round => round.estimates[id] = null);
     if (event.type === "quiz") event.answers.forEach(answer => answer[id] = 0);
     if (event.type === "taste") event.rounds.forEach(round => round[id] = { exact: false, ingredients: 0 });
+    if (event.type === "manual") event.scores[id] = 0;
   });
   saveState("Équipe ajoutée");
   render();
@@ -716,12 +880,95 @@ function removeTeam(teamId) {
     if (event.type === "estimate") event.rounds.forEach(round => delete round.estimates[teamId]);
     if (event.type === "quiz") event.answers.forEach(answer => delete answer[teamId]);
     if (event.type === "taste") event.rounds.forEach(round => delete round[teamId]);
+    if (event.type === "manual") delete event.scores[teamId];
     if (event.type === "winners") event.winners.forEach(winner => {
       if (winner.team1 === teamId) winner.team1 = "";
       if (winner.team2 === teamId) winner.team2 = "";
     });
   });
   saveState("Équipe supprimée");
+  render();
+}
+
+function customEventId(name) {
+  const base = String(name)
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    .slice(0, 28) || "epreuve";
+  let id = `custom-${base}`;
+  let number = 2;
+  while (state.events[id]) id = `custom-${base}-${number++}`;
+  return id;
+}
+
+function createCustomEvent(formData) {
+  const name = String(formData.get("name") || "").trim();
+  const rule = String(formData.get("rule") || "").trim();
+  const type = String(formData.get("type") || "manual");
+  if (!name || !rule) {
+    showToast("Le nom et les règles sont obligatoires");
+    return;
+  }
+  const id = customEventId(name);
+  let event;
+
+  if (type === "rank") {
+    const scale = String(formData.get("scale") || "")
+      .split(/[,;]+/).map(value => Number(value.trim())).filter(Number.isFinite);
+    if (!scale.length) {
+      showToast("Ajoutez au moins une valeur dans le barème");
+      return;
+    }
+    event = { type: "rank", ranks: Object.fromEntries(teams().map(team => [team.id, null])), scale };
+  }
+
+  if (type === "estimate") {
+    const count = Math.max(1, Math.min(30, Number(formData.get("rounds")) || 1));
+    event = {
+      type: "estimate",
+      unit: String(formData.get("unit") || ""),
+      closestPoints: Number(formData.get("closestPoints")) || 0,
+      exactBonus: Number(formData.get("exactBonus")) || 0,
+      rounds: Array.from({ length: count }, () => ({
+        actual: null,
+        estimates: Object.fromEntries(teams().map(team => [team.id, null]))
+      }))
+    };
+  }
+
+  if (type === "quiz") {
+    const count = Math.max(1, Math.min(50, Number(formData.get("questions")) || 1));
+    event = {
+      type: "quiz",
+      pointsPerAnswer: Number(formData.get("pointsPerAnswer")) || 0,
+      answers: Array.from({ length: count }, () => Object.fromEntries(teams().map(team => [team.id, 0])))
+    };
+  }
+
+  if (type === "manual") {
+    event = { type: "manual", scores: Object.fromEntries(teams().map(team => [team.id, 0])) };
+  }
+
+  state.events[id] = event;
+  state.eventDefs.push({ id, name, short: name.slice(0, 24), rule, custom: true });
+  state.enabled[id] = true;
+  state.order.push(id);
+  creatingEvent = false;
+  currentEvent = id;
+  saveState("Nouvelle épreuve créée");
+  render();
+  window.scrollTo(0, 0);
+}
+
+function deleteCustomEvent(id) {
+  const def = eventDef(id);
+  if (!def?.custom || !confirm(`Supprimer définitivement l’épreuve « ${def.name} » ?`)) return;
+  delete state.events[id];
+  delete state.enabled[id];
+  state.eventDefs = state.eventDefs.filter(item => item.id !== id);
+  state.order = state.order.filter(item => item !== id);
+  currentEvent = null;
+  saveState("Épreuve supprimée");
   render();
 }
 
@@ -742,6 +989,7 @@ function updateField(input) {
   if (field === "team1" || field === "team2") event.winners[roundIndex][field] = value;
   if (field === "exact") event.rounds[roundIndex][team].exact = value === "1";
   if (field === "ingredients") event.rounds[roundIndex][team].ingredients = value || 0;
+  if (field === "manualScore") event.scores[team] = value || 0;
 }
 
 function moveEvent(id, direction) {

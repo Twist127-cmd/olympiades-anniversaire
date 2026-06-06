@@ -12,6 +12,23 @@ Application web mobile de suivi des scores des 11 épreuves.
 L’onglet **Équipes** permet d’ajouter ou supprimer des équipes, de modifier
 leurs noms et de choisir leurs couleurs. Deux à dix équipes peuvent participer.
 
+## Gestion des épreuves
+
+Dans l’onglet **Épreuves**, chaque jeu peut être activé ou désactivé avec son
+interrupteur. Une épreuve désactivée conserve ses saisies, mais ne compte plus
+dans le classement ni dans la courbe de progression.
+
+Le bouton **Créer une nouvelle épreuve** ouvre un assistant proposant quatre
+modèles :
+
+- classement avec barème par position ;
+- estimation au plus proche avec bonus exact ;
+- quiz avec points par bonne réponse ;
+- points libres saisis directement par équipe.
+
+Les épreuves personnalisées peuvent ensuite être réorganisées, désactivées ou
+supprimées comme les autres.
+
 Les données sont sauvegardées automatiquement sur l’appareil. L’onglet
 **Réglages** permet aussi d’exporter une sauvegarde JSON dans Fichiers ou iCloud.
 
