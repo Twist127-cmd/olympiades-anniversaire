@@ -1,9 +1,14 @@
-const CACHE = "olympiades-v5";
+const CACHE = "olympiades-v6";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=5",
-  "./app.js?v=5",
+  "./styles.css?v=6",
+  "./app.js?v=6",
+  "./firebase-config.js?v=6",
+  "./firebase-sync.js?v=6",
+  "./scores.html",
+  "./scores.js?v=6",
+  "./public.css?v=6",
   "./manifest.webmanifest",
   "./icons/icon.svg",
   "./icons/icon-512.png",

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <title>Scores des Olympiades</title>
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="public.css?v=6">
+</head>
+<body>
+  <header class="public-header">
+    <div>
+      <p class="eyebrow">30 ANS · OLYMPIADES</p>
+      <h1>Scores en direct</h1>
+    </div>
+    <span id="live-status" class="live-pill waiting">Connexion…</span>
+  </header>
+
+  <main id="public-app">
+    <section class="loading-card">
+      <div class="spinner"></div>
+      <h2>Chargement du classement</h2>
+      <p>Les résultats apparaîtront dès leur publication par le maître du jeu.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p id="last-update">En attente de la première publication</p>
+  </footer>
+  <script type="module" src="scores.js?v=6"></script>
+</body>
+</html>

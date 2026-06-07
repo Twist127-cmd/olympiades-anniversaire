@@ -2,6 +2,18 @@
 
 Application web mobile de suivi des scores des 11 épreuves.
 
+## Version APP V3
+
+Cette version ajoute une publication Firebase :
+
+- `index.html` reste l’application privée du maître du jeu ;
+- `scores.html` est la page publique actualisée en direct ;
+- seul le compte Firebase autorisé peut publier ;
+- les invités disposent uniquement d’un accès en lecture.
+
+Suivre intégralement [GUIDE_FIREBASE.md](GUIDE_FIREBASE.md) avant la première
+publication.
+
 ## Utilisation
 
 1. Ouvrir l’application dans Safari sur iPhone.

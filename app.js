@@ -1,5 +1,5 @@
 const STORAGE_KEY = "olympiades-anniversaire-v1";
-const APP_VERSION = "5.0";
+const APP_VERSION = "6.0";
 
 const DEFAULT_TEAMS = [
   { id: "CAIPI", name: "CAIPI", color: "#ef4444" },
@@ -693,6 +693,32 @@ function renderSettings() {
         </div>
         <strong class="version-number">v${APP_VERSION}</strong>
       </article>
+      <article class="card setting-card publish-card">
+        <h3>Publication des scores</h3>
+        <p>Connectez le compte du maître du jeu, puis publiez le classement sur la page publique.</p>
+        <div id="firebase-setup-warning" class="sync-warning" hidden>
+          Firebase n’est pas encore configuré. Consultez le fichier GUIDE_FIREBASE.md.
+        </div>
+        <div id="master-login-panel">
+          <label>Adresse e-mail du maître du jeu
+            <input type="email" id="master-email" autocomplete="username" placeholder="votre@email.fr">
+          </label>
+          <label style="margin-top:9px">Mot de passe
+            <input type="password" id="master-password" autocomplete="current-password">
+          </label>
+          <button class="button wide" id="master-login-btn">Se connecter</button>
+        </div>
+        <div id="master-publish-panel" hidden>
+          <div class="sync-user-row">
+            <span class="status-pill">Connecté</span>
+            <strong id="master-user-email"></strong>
+          </div>
+          <button class="button wide" id="publish-scores-btn">Publier les scores maintenant</button>
+          <button class="button secondary wide" id="master-logout-btn">Se déconnecter</button>
+        </div>
+        <p id="publish-status" class="publish-status">Aucune publication effectuée sur cet appareil.</p>
+        <a class="public-link" href="scores.html" target="_blank" rel="noopener">Ouvrir la page publique</a>
+      </article>
       <article class="card setting-card">
         <h3>Sauvegarde automatique</h3>
         <p>Chaque modification est enregistrée immédiatement sur cet appareil. L’application fonctionne hors connexion après sa première ouverture.</p>
@@ -736,6 +762,7 @@ function render() {
     button.classList.toggle("active", button.dataset.view === currentView);
   });
   bindDragAndDrop();
+  document.dispatchEvent(new CustomEvent("olympiades:render"));
 }
 
 function navigate(view) {
@@ -1065,6 +1092,44 @@ function exportData() {
   showToast("Sauvegarde exportée");
 }
 
+function buildPublicSnapshot() {
+  const ranked = ranking();
+  const activeIds = activeOrder();
+  let cumulative = Object.fromEntries(teams().map(team => [team.id, 0]));
+  const events = activeIds.map((id, index) => {
+    const scores = scoresFor(id);
+    teams().forEach(team => cumulative[team.id] += scores[team.id]);
+    const def = eventDef(id);
+    return {
+      id,
+      number: index + 1,
+      name: def.name,
+      scores,
+      cumulative: { ...cumulative }
+    };
+  });
+  return {
+    schemaVersion: 1,
+    title: "Olympiades Anniversaire",
+    teams: teams().map(team => ({ id: team.id, name: team.name, color: team.color })),
+    ranking: ranked.map((team, index) => ({
+      position: index + 1,
+      id: team.id,
+      name: team.name,
+      color: team.color,
+      score: team.score
+    })),
+    events,
+    activeEventCount: activeIds.length,
+    totalEventCount: state.order.length
+  };
+}
+
+window.olympiadesMaster = {
+  getPublicSnapshot: buildPublicSnapshot,
+  showToast
+};
+
 async function checkForUpdate() {
   if (!("serviceWorker" in navigator)) {
     window.location.reload();
@@ -1119,7 +1184,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 
   window.addEventListener("load", async () => {
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=5", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=6", { updateViaCache: "none" });
       await registration.update();
     } catch (error) {
       console.warn(error);

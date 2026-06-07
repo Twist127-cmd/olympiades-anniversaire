@@ -599,6 +599,39 @@ input:focus, select:focus, textarea:focus {
   font-size: 17px;
 }
 
+.publish-card label { margin-top: 10px; }
+.publish-card .button { margin-top: 10px; }
+
+.sync-warning {
+  margin: 12px 0;
+  padding: 11px 12px;
+  border-radius: 13px;
+  color: #92400e;
+  background: #fef3c7;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sync-user-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 11px 0 2px;
+}
+
+.sync-user-row strong { font-size: 12px; }
+.publish-status { margin: 12px 0 0; font-size: 12px !important; }
+
+.public-link {
+  display: block;
+  margin-top: 13px;
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 850;
+  text-align: center;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
