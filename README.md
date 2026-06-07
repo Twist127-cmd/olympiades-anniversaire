@@ -34,6 +34,14 @@ Chaque fiche d’épreuve affiche désormais deux encadrés avant la saisie :
 le barème. Ces deux informations sont également demandées lors de la création
 d’une nouvelle épreuve.
 
+## Vérifier une mise à jour
+
+La version courante est affichée en haut de l’onglet **Réglages**. Après
+publication des fichiers sur GitHub Pages, l’application vérifie désormais le
+réseau au lancement avant d’utiliser sa copie hors connexion.
+
+Pour cette version, l’indication attendue est **v5.0**.
+
 Les données sont sauvegardées automatiquement sur l’appareil. L’onglet
 **Réglages** permet aussi d’exporter une sauvegarde JSON dans Fichiers ou iCloud.
 

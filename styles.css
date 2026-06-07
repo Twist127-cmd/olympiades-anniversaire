@@ -571,6 +571,34 @@ input:focus, select:focus, textarea:focus {
 .setting-card p { color: var(--muted); font-size: 13px; line-height: 1.5; }
 .setting-card .button { margin-top: 8px; }
 
+.version-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-color: #c4b5fd;
+  background: linear-gradient(145deg, #faf5ff, #eef2ff);
+}
+
+.version-card h3,
+.version-card p { margin-bottom: 0; }
+
+.version-card .update-button {
+  min-height: 38px;
+  margin-top: 11px;
+  padding: 7px 11px;
+  font-size: 12px;
+}
+
+.version-number {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border-radius: 13px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand), #4f46e5);
+  font-size: 17px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;

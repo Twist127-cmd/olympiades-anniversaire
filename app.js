@@ -1,4 +1,5 @@
 const STORAGE_KEY = "olympiades-anniversaire-v1";
+const APP_VERSION = "5.0";
 
 const DEFAULT_TEAMS = [
   { id: "CAIPI", name: "CAIPI", color: "#ef4444" },
@@ -684,6 +685,14 @@ function renderTeams() {
 function renderSettings() {
   return `
     <section class="settings-stack">
+      <article class="card setting-card version-card">
+        <div>
+          <h3>Version de l’application</h3>
+          <p>Cette indication permet de vérifier que l’iPhone utilise bien les derniers fichiers publiés.</p>
+          <button class="button secondary update-button" id="update-app-btn">Vérifier les mises à jour</button>
+        </div>
+        <strong class="version-number">v${APP_VERSION}</strong>
+      </article>
       <article class="card setting-card">
         <h3>Sauvegarde automatique</h3>
         <p>Chaque modification est enregistrée immédiatement sur cet appareil. L’application fonctionne hors connexion après sa première ouverture.</p>
@@ -793,6 +802,7 @@ document.querySelector("#app").addEventListener("click", event => {
   }
   if (event.target.closest("#export-btn")) exportData();
   if (event.target.closest("#import-btn")) document.querySelector("#import-file").click();
+  if (event.target.closest("#update-app-btn")) checkForUpdate();
   if (event.target.closest("#blank-btn") && confirm("Commencer une nouvelle partie ? Les données actuelles seront remplacées.")) {
     state = blankState();
     saveState("Nouvelle partie créée");
@@ -1055,13 +1065,37 @@ function exportData() {
   showToast("Sauvegarde exportée");
 }
 
+async function checkForUpdate() {
+  if (!("serviceWorker" in navigator)) {
+    window.location.reload();
+    return;
+  }
+  showToast("Recherche d’une mise à jour…");
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (registration) await registration.update();
+    const url = new URL(window.location.href);
+    url.searchParams.set("update", Date.now());
+    window.location.replace(url.href);
+  } catch {
+    showToast("Impossible de vérifier maintenant");
+  }
+}
+
 document.querySelector("#import-file").addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
   try {
     const imported = JSON.parse(await file.text());
     if (!imported.events || !Array.isArray(imported.order)) throw new Error("Format invalide");
-    state = migrateState({ version: imported.version || 1, teams: imported.teams, events: imported.events, order: imported.order });
+    state = migrateState({
+      version: imported.version || 1,
+      teams: imported.teams,
+      eventDefs: imported.eventDefs,
+      enabled: imported.enabled,
+      events: imported.events,
+      order: imported.order
+    });
     saveState("Sauvegarde restaurée");
     render();
   } catch {
@@ -1076,7 +1110,21 @@ document.querySelector("#fullscreen-btn").addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(console.warn));
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("./sw.js?v=5", { updateViaCache: "none" });
+      await registration.update();
+    } catch (error) {
+      console.warn(error);
+    }
+  });
 }
 
 render();
