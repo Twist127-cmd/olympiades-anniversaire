@@ -153,6 +153,12 @@ function migrateState(data) {
   data.eventDefs.forEach(def => {
     if (data.enabled[def.id] === undefined) data.enabled[def.id] = true;
   });
+  Object.values(data.events || {}).forEach(event => {
+    if (event.type === "taste") {
+      if (event.exactPoints === undefined) event.exactPoints = 5;
+      if (event.ingredientPoints === undefined) event.ingredientPoints = 1;
+    }
+  });
   data.order = data.order.filter(id => data.events[id]);
   data.eventDefs.forEach(def => {
     if (!data.order.includes(def.id)) data.order.push(def.id);
@@ -218,6 +224,101 @@ function num(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function clampCount(value, min, max) {
+  return Math.max(min, Math.min(max, Number(value) || min));
+}
+
+function blankRanks() {
+  return Object.fromEntries(teams().map(team => [team.id, null]));
+}
+
+function blankPenalties() {
+  return Object.fromEntries(teams().map(team => [team.id, 0]));
+}
+
+function blankManualScores() {
+  return Object.fromEntries(teams().map(team => [team.id, 0]));
+}
+
+function blankEstimateRound(previous) {
+  return {
+    actual: previous?.actual ?? null,
+    estimates: Object.fromEntries(teams().map(team => [team.id, previous?.estimates?.[team.id] ?? null]))
+  };
+}
+
+function blankQuizAnswer(previous) {
+  return Object.fromEntries(teams().map(team => [team.id, previous?.[team.id] ?? 0]));
+}
+
+function blankTasteRound(previous) {
+  return Object.fromEntries(teams().map(team => [team.id, {
+    exact: Boolean(previous?.[team.id]?.exact),
+    ingredients: num(previous?.[team.id]?.ingredients) || 0
+  }]));
+}
+
+function blankWinner(previous, defaultPoints = 0, forcedPoints = null) {
+  return {
+    participant: previous?.participant ?? "",
+    team1: previous?.team1 ?? "",
+    team2: previous?.team2 ?? "",
+    points: forcedPoints ?? num(previous?.points) ?? defaultPoints
+  };
+}
+
+function resizeList(items, count, builder) {
+  return Array.from({ length: count }, (_, index) => builder(items[index], index));
+}
+
+function eventTypeLabel(type) {
+  return ({
+    rank: "Classement",
+    penaltyRank: "Classement avec pénalité",
+    estimate: "Estimation au plus proche",
+    quiz: "Quiz / bonnes réponses",
+    winners: "Podium / gagnants",
+    taste: "Goût exact + ingrédients",
+    manual: "Points libres"
+  })[type] || type;
+}
+
+function scoringTypeOptions(selected) {
+  return ["rank", "penaltyRank", "estimate", "quiz", "winners", "taste", "manual"].map(type =>
+    `<option value="${type}" ${selected === type ? "selected" : ""}>${eventTypeLabel(type)}</option>`
+  ).join("");
+}
+
+function serializePoints(values) {
+  return values.map(value => Number(value) || 0).join(", ");
+}
+
+function describeScoringRule(event, fallback = "") {
+  if (!event) return fallback;
+  if (event.type === "rank") {
+    return `Classement final : ${event.scale.map((points, index) => `${index + 1}${index === 0 ? "er" : "e"} = ${Number(points) || 0} points`).join(", ")}.`;
+  }
+  if (event.type === "penaltyRank") {
+    return `Classement final : ${event.scale.map((points, index) => `${index + 1}${index === 0 ? "er" : "e"} = ${Number(points) || 0} points`).join(", ")}, puis la pénalité saisie est soustraite.`;
+  }
+  if (event.type === "estimate") {
+    return `La valeur la plus proche gagne ${Number(event.closestPoints ?? 5)} points. Une estimation exacte ajoute ${Number(event.exactBonus ?? 20)} points.`;
+  }
+  if (event.type === "quiz") {
+    return `Chaque bonne réponse rapporte ${Number(event.pointsPerAnswer ?? 2)} points.`;
+  }
+  if (event.type === "winners") {
+    return `${event.winners.map((winner, index) => `${index + 1}${index === 0 ? "er" : "e"} = ${Number(winner.points) || 0} points`).join(", ")}. Un duo attribue tous les points aux deux équipes.`;
+  }
+  if (event.type === "taste") {
+    return `Goût exact = ${Number(event.exactPoints ?? 5)} points, plus ${Number(event.ingredientPoints ?? 1)} point${Number(event.ingredientPoints ?? 1) > 1 ? "s" : ""} par ingrédient trouvé.`;
+  }
+  if (event.type === "manual") {
+    return "Les points sont saisis manuellement pour chaque équipe.";
+  }
+  return fallback;
+}
+
 function scoresFor(eventId) {
   const event = state.events[eventId];
   const scores = emptyScores();
@@ -273,7 +374,8 @@ function scoresFor(eventId) {
   if (event.type === "taste") {
     event.rounds.forEach(round => teams().forEach(team => {
       const answer = round[team.id];
-      scores[team.id] += (answer.exact ? 5 : 0) + Math.max(0, num(answer.ingredients) || 0);
+      scores[team.id] += (answer.exact ? Number(event.exactPoints ?? 5) : 0)
+        + Math.max(0, num(answer.ingredients) || 0) * Number(event.ingredientPoints ?? 1);
     }));
   }
 
@@ -498,6 +600,70 @@ function creatorOptions(type) {
     <p class="muted">Un champ de score sera affiché pour chaque équipe. Idéal pour une règle spéciale ou un jeu ponctuel.</p>`;
 }
 
+function eventConfigOptions(type, event) {
+  if (type === "rank" || type === "penaltyRank") return `
+    <div class="field-grid">
+      <label>Points par position<input name="scale" value="${escapeHtml(serializePoints(event?.scale || [15, 10, 5, 0]))}" required></label>
+    </div>`;
+  if (type === "estimate") return `
+    <div class="field-grid">
+      <label>Nombre de manches<input type="number" name="rounds" min="1" max="30" value="${event?.type === "estimate" ? event.rounds.length : 3}" required></label>
+      <label>Unité<input name="unit" maxlength="8" value="${escapeHtml(event?.type === "estimate" ? event.unit || "" : "")}" placeholder="m, g, €, s..."></label>
+      <label>Points au plus proche<input type="number" name="closestPoints" value="${event?.type === "estimate" ? Number(event.closestPoints ?? 5) : 5}" required></label>
+      <label>Bonus valeur exacte<input type="number" name="exactBonus" value="${event?.type === "estimate" ? Number(event.exactBonus ?? 20) : 20}" required></label>
+    </div>`;
+  if (type === "quiz") return `
+    <div class="field-grid">
+      <label>Nombre de questions<input type="number" name="questions" min="1" max="50" value="${event?.type === "quiz" ? event.answers.length : 10}" required></label>
+      <label>Points par bonne réponse<input type="number" name="pointsPerAnswer" value="${event?.type === "quiz" ? Number(event.pointsPerAnswer ?? 2) : 2}" required></label>
+    </div>`;
+  if (type === "winners") return `
+    <div class="field-grid">
+      <label>Nombre de prix<input type="number" name="winnersCount" min="1" max="20" value="${event?.type === "winners" ? event.winners.length : 3}" required></label>
+      <label>Points par prix<input name="winnerPoints" value="${escapeHtml(event?.type === "winners" ? serializePoints(event.winners.map(winner => winner.points)) : "30, 20, 10")}" required></label>
+    </div>`;
+  if (type === "taste") return `
+    <div class="field-grid">
+      <label>Nombre de manches<input type="number" name="rounds" min="1" max="30" value="${event?.type === "taste" ? event.rounds.length : 6}" required></label>
+      <label>Points goût exact<input type="number" name="exactPoints" value="${event?.type === "taste" ? Number(event.exactPoints ?? 5) : 5}" required></label>
+      <label>Points par ingrédient<input type="number" name="ingredientPoints" value="${event?.type === "taste" ? Number(event.ingredientPoints ?? 1) : 1}" required></label>
+    </div>`;
+  return `<p class="muted">Un champ de score libre sera affiché pour chaque équipe.</p>`;
+}
+
+function eventConfigHelp(type) {
+  return {
+    rank: "Chaque équipe reçoit les points correspondant à sa position finale.",
+    penaltyRank: "Le classement donne les points de base, puis la pénalité saisie est retirée.",
+    estimate: "L'application compare chaque estimation à la valeur réelle et récompense les plus proches.",
+    quiz: "Chaque bonne réponse ajoute automatiquement le nombre de points choisi.",
+    winners: "Chaque prix attribue ses points à l'équipe gagnante, ou aux deux équipes en cas de duo.",
+    taste: "Chaque manche combine un bonus pour le goût exact et des points par ingrédient trouvé.",
+    manual: "Vous saisissez directement le score final de chaque équipe."
+  }[type];
+}
+
+function renderEventConfig(id, def, event) {
+  if (def.custom) return "";
+  return `
+    <section class="card">
+      <h3>Paramètres de comptage</h3>
+      <p class="muted">Vous pouvez changer le type de comptage des jeux standards et ajuster le nombre de manches quand le modèle en a besoin.</p>
+      <form class="creator-stack" data-event-config="${id}">
+        <div class="field-grid">
+          <label>Type de comptage
+            <select name="type" data-config-type="${id}">
+              ${scoringTypeOptions(event.type)}
+            </select>
+          </label>
+        </div>
+        <div class="field-grid" id="event-config-options">${eventConfigOptions(event.type, event)}</div>
+        <p class="muted" id="event-config-help">${eventConfigHelp(event.type)}</p>
+        <button class="button wide" type="submit">Enregistrer les paramètres</button>
+      </form>
+    </section>`;
+}
+
 function renderEventEditor(id) {
   const def = eventDef(id);
   const event = state.events[id];
@@ -513,13 +679,14 @@ function renderEventEditor(id) {
     </section>
     <section class="scoring-explanation">
       <span class="explanation-icon">+</span>
-      <div><h3>Comptabilisation des points</h3><p>${escapeHtml(def.rule)}</p></div>
+      <div><h3>Comptabilisation des points</h3><p>${escapeHtml(def.custom ? def.rule : describeScoringRule(event, def.rule))}</p></div>
     </section>
     <section class="event-state-card ${enabled ? "is-active" : ""}">
       <div><strong>${enabled ? "Épreuve active" : "Épreuve désactivée"}</strong>
       <small>${enabled ? "Ses points comptent dans le classement." : "Les saisies sont conservées, mais les points ne comptent pas."}</small></div>
       <label class="event-switch"><input type="checkbox" data-toggle-event="${id}" ${enabled ? "checked" : ""}><span></span></label>
     </section>
+    ${renderEventConfig(id, def, event)}
     ${scoreStrip(id)}
     ${event.type === "rank" ? rankEditor(id, event) : ""}
     ${event.type === "penaltyRank" ? penaltyRankEditor(id, event) : ""}
@@ -617,7 +784,7 @@ function winnersEditor(id, event) {
 function tasteEditor(id, event) {
   return event.rounds.map((round, index) => `
     <section class="round-card">
-      <div class="round-title"><span>Saveur ${index + 1}</span><span class="muted">5 pts + ingrédients</span></div>
+      <div class="round-title"><span>Saveur ${index + 1}</span><span class="muted">${Number(event.exactPoints ?? 5)} pts + ${Number(event.ingredientPoints ?? 1)} / ingrédient</span></div>
       <div class="field-grid">
         ${teams().map(team => `<div class="field-team" style="${teamStyle(team.id)}">
           <label>${escapeHtml(team.name)} · goût exact
@@ -862,6 +1029,16 @@ document.querySelector("#app").addEventListener("change", event => {
     document.querySelector("#creator-help").textContent = help[event.target.value];
     return;
   }
+  const configType = event.target.closest("[data-config-type]");
+  if (configType) {
+    const eventId = configType.dataset.configType;
+    const eventConfig = state.events[eventId];
+    const options = document.querySelector("#event-config-options");
+    const help = document.querySelector("#event-config-help");
+    if (options) options.innerHTML = eventConfigOptions(configType.value, eventConfig);
+    if (help) help.textContent = eventConfigHelp(configType.value);
+    return;
+  }
   const teamSetting = event.target.closest("[data-team-setting]");
   if (teamSetting) {
     updateTeamSetting(teamSetting);
@@ -875,9 +1052,15 @@ document.querySelector("#app").addEventListener("change", event => {
 });
 
 document.querySelector("#app").addEventListener("submit", event => {
-  if (event.target.id !== "event-creator-form") return;
+  if (event.target.id === "event-creator-form") {
+    event.preventDefault();
+    createCustomEvent(new FormData(event.target));
+    return;
+  }
+  const configForm = event.target.closest("[data-event-config]");
+  if (!configForm) return;
   event.preventDefault();
-  createCustomEvent(new FormData(event.target));
+  updateStandardEventConfig(configForm.dataset.eventConfig, new FormData(configForm));
 });
 
 function updateTeamSetting(input) {
@@ -954,6 +1137,80 @@ function customEventId(name) {
   return id;
 }
 
+function parsePointList(rawValue, fallback) {
+  const values = String(rawValue || "")
+    .split(/[,;]+/)
+    .map(value => Number(value.trim()))
+    .filter(Number.isFinite);
+  return values.length ? values : fallback;
+}
+
+function buildConfiguredEvent(type, formData, previousEvent) {
+  if (type === "rank") {
+    return {
+      type: "rank",
+      ranks: previousEvent?.ranks ? { ...previousEvent.ranks } : blankRanks(),
+      scale: parsePointList(formData.get("scale"), previousEvent?.scale || [15, 10, 5, 0])
+    };
+  }
+
+  if (type === "penaltyRank") {
+    return {
+      type: "penaltyRank",
+      ranks: previousEvent?.ranks ? { ...previousEvent.ranks } : blankRanks(),
+      penalties: previousEvent?.penalties ? { ...previousEvent.penalties } : blankPenalties(),
+      scale: parsePointList(formData.get("scale"), previousEvent?.scale || [15, 10, 5, 0])
+    };
+  }
+
+  if (type === "estimate") {
+    const count = clampCount(formData.get("rounds"), 1, 30);
+    return {
+      type: "estimate",
+      unit: String(formData.get("unit") || ""),
+      closestPoints: Number(formData.get("closestPoints")) || 0,
+      exactBonus: Number(formData.get("exactBonus")) || 0,
+      rounds: resizeList(previousEvent?.type === "estimate" ? previousEvent.rounds : [], count, round => blankEstimateRound(round))
+    };
+  }
+
+  if (type === "quiz") {
+    const count = clampCount(formData.get("questions"), 1, 50);
+    return {
+      type: "quiz",
+      pointsPerAnswer: Number(formData.get("pointsPerAnswer")) || 0,
+      answers: resizeList(previousEvent?.type === "quiz" ? previousEvent.answers : [], count, answer => blankQuizAnswer(answer))
+    };
+  }
+
+  if (type === "winners") {
+    const count = clampCount(formData.get("winnersCount"), 1, 20);
+    const parsedPoints = parsePointList(formData.get("winnerPoints"), previousEvent?.type === "winners"
+      ? previousEvent.winners.map(winner => winner.points)
+      : [30, 20, 10]);
+    return {
+      type: "winners",
+      winners: resizeList(previousEvent?.type === "winners" ? previousEvent.winners : [], count, (winner, index) =>
+        blankWinner(winner, parsedPoints[index] ?? parsedPoints[parsedPoints.length - 1] ?? 0, parsedPoints[index] ?? parsedPoints[parsedPoints.length - 1] ?? 0))
+    };
+  }
+
+  if (type === "taste") {
+    const count = clampCount(formData.get("rounds"), 1, 30);
+    return {
+      type: "taste",
+      exactPoints: Number(formData.get("exactPoints")) || 0,
+      ingredientPoints: Number(formData.get("ingredientPoints")) || 0,
+      rounds: resizeList(previousEvent?.type === "taste" ? previousEvent.rounds : [], count, round => blankTasteRound(round))
+    };
+  }
+
+  return {
+    type: "manual",
+    scores: previousEvent?.type === "manual" ? { ...previousEvent.scores } : blankManualScores()
+  };
+}
+
 function createCustomEvent(formData) {
   const name = String(formData.get("name") || "").trim();
   const description = String(formData.get("description") || "").trim();
@@ -1023,6 +1280,22 @@ function deleteCustomEvent(id) {
   state.order = state.order.filter(item => item !== id);
   currentEvent = null;
   saveState("Épreuve supprimée");
+  render();
+}
+
+function updateStandardEventConfig(eventId, formData) {
+  const def = eventDef(eventId);
+  const previousEvent = state.events[eventId];
+  if (!def || def.custom || !previousEvent) return;
+  const nextType = String(formData.get("type") || previousEvent.type);
+
+  if (nextType !== previousEvent.type && !confirm("Changer le type de comptage réinitialisera les résultats incompatibles déjà saisis. Continuer ?")) {
+    render();
+    return;
+  }
+
+  state.events[eventId] = buildConfiguredEvent(nextType, formData, previousEvent);
+  saveState("Paramètres de comptage enregistrés");
   render();
 }
 
